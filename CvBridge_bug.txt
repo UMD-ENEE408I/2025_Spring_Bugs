@@ -1,0 +1,121 @@
+When following the video to get the camera streaming to the jetson, we came across an issue and I just wanted to share the solution because it was not very intuitive.
+
+When running camera_subscriber.py we get an error "SystemError: initialization of cv_bridge_boost raised unreported exception" which is due to the imports
+
+from cv_bridge import CvBridge
+import cv2
+
+which should be reversed to
+
+import cv2
+from cv_bridge import CvBridge
+
+according to this solution: https://answers.ros.org/question/362388/
+
+Also - if anyone doesn't want to take all the time to transcribe the code and commands from the videos - I pasted the code and commands below - hope it helps.
+
+~ Some bits of bash he uses, just follow video but copy paste if you want ~
+
+sudo apt install ros-noetic-usb-cam # note I did not need to run this on the Jetson
+sudo apt install ros-noetic-perception
+
+
+mkdir -p ~/ros_open_cv_ws/src
+cd ~/ros_open_cv_ws
+catkin_make
+source ~/ros_open_cv_ws/devel/setup.bash
+echo $ROS_PACKAGE_PATH
+
+cd ~/ros_open_cv_ws/src
+catkin_create_pkg ros_opencv image_transport cv_bridge sensor_msgs rospy roscpp std_msgs
+cd ~/ros_open_cv_ws/src/ros_opencv/
+mkdir python_script
+cd python_script/
+gedit camera_publisher.py # Note unless you have a monitor on the pi, you'll need to use vim or nano instead of gedit
+chmod +x camera_publisher.py
+gedit camera_subscriber.py
+chmod +x camera_subscriber.py
+
+~ camera_publisher.py (RUNS ON THE RPI) ~
+
+#!/usr/bin/env python3
+
+import rospy
+
+from sensor_msgs.msg import Image
+
+# into a ROS image message and for converting ROS image message back to OpenCV images
+# That is, it serves as a bridge between OpenCV and ROS
+from cv_bridge import CvBridge
+
+# here we import OpenCV
+import cv2
+
+# create the name of our publisher node - change as you wish
+publisherNodeName='camera_sensor_publisher'
+
+# create the name of our topic over which we will transmit the image messages
+# make sure that the same name is used in the source file of the subscriber
+topicName='video_topic'
+
+# initialize the node
+rospy.init_node(publisherNodeName, anonymous=True)
+
+# create a publisher object, specify the name of the topic, a type of the message being sent (Image),
+# and define the buffer size (queue_size)
+publisher=rospy.Publisher(topicName, Image, queue_size=60)
+# rate of transmitting the messages
+rate = rospy.Rate(30)
+
+# create the video capture object
+videoCaptureObject=cv2.VideoCapture(0)
+
+# create the CvBridge object that will be used to convert OpenCV Images to ROS image messages
+bridgeObject=CvBridge()
+
+# here is where the magic happens
+# this is an infinite loop that captures the images and transmits them through the topic
+while not rospy.is_shutdown():
+# returns two values, the first value is the boolean for success/failure
+# the second one is the actual frame
+returnValue, capturedFrame = videoCaptureObject.read()
+# everything is OK, transmit
+if returnValue == True:
+# print the message
+rospy.loginfo('Video frame captured and published')
+# convert OpenCV to ROS image message
+imageToTransmit=bridgeObject.cv2_to_imgmsg(capturedFrame)
+# publish the converted image through the topic
+publisher.publish(imageToTransmit)
+# here wait for certain time to make sure that the specified transmission rate is achieved
+rate.sleep()
+
+
+
+~ camera_subscriber.py (RUNS ON THE JETSON) ~
+
+#!/usr/bin/env python3
+
+import rospy
+from sensor_msgs.msg import Image
+import cv2 # note this is the correct order, swapped from video.
+from cv_bridge import CvBridge
+
+subscriberNodeName='camera_sensor_subscriber'
+topicName='video_topic'
+
+def callbackFunction(message):
+bridgeObject = CvBridge()
+
+rospy.loginfo("received a video message/frame")
+
+convertedFrameBackToCV = bridgeObject.imgmsg_to_cv2(message)
+
+cv2.imshow("camera", convertedFrameBackToCV)
+
+cv2.waitKey(1)
+
+rospy.init_node(subscriberNodeName, anonymous=True)
+rospy.Subscriber(topicName, Image, callbackFunction)
+rospy.spin()
+cv2.destroyAllWindows()
