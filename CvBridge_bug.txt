@@ -1,3 +1,5 @@
+#From Forrest
+
 When following the video to get the camera streaming to the jetson, we came across an issue and I just wanted to share the solution because it was not very intuitive.
 
 When running camera_subscriber.py we get an error "SystemError: initialization of cv_bridge_boost raised unreported exception" which is due to the imports
