@@ -1,0 +1,63 @@
+Here is the publisher and subscriber code Team 3 used to help reduce latency in their camera transmission.
+
+Publisher:
+File Edit Options Buffers Tools Python Help
+#!/usr/bin/env python3
+import rospy
+from sensor_msgs.msg import CompressedImage
+from cv_bridge import CvBridge
+import cv2
+
+publisherNodeName = "camera_sensor_publisher"
+topicName = "video_topic/compressed"
+
+rospy.init_node(publisherNodeName, anonymous=True)
+publisher = rospy.Publisher(topicName, CompressedImage, queue_size=1)
+rate = rospy.Rate(10) # Reduce FPS to 10 for stability
+
+videoCaptureObject = cv2.VideoCapture(0)
+bridgeObject = CvBridge()
+
+while not rospy.is_shutdown():
+ret, frame = videoCaptureObject.read()
+if ret:
+rospy.loginfo("Video frame captured and published")
+
+# Reduce resolution (e.g., 640x480)
+frame = cv2.resize(frame, (640, 480))
+
+# Convert to compressed image format
+compressedImage = bridgeObject.cv2_to_compressed_imgmsg(frame, dst_format="jpeg")
+
+# Publish compressed image
+publisher.publish(compressedImage)
+
+rate.sleep()
+
+
+
+
+Subscriber:
+#!/usr/bin/env python3
+import rospy
+from sensor_msgs.msg import CompressedImage
+import cv2
+from cv_bridge import CvBridge
+
+subscriberNodeName = "camera_sensor_subscriber"
+topicName = "video_topic/compressed"
+
+def callbackFunction(message):
+bridgeObject = CvBridge()
+rospy.loginfo("Received a video frame")
+
+# Convert from compressed image
+frame = bridgeObject.compressed_imgmsg_to_cv2(message)
+
+cv2.imshow("camera", frame)
+cv2.waitKey(1)
+
+rospy.init_node(subscriberNodeName, anonymous=True)
+rospy.Subscriber(topicName, CompressedImage, callbackFunction, queue_size=1)
+rospy.spin()
+cv2.destroyAllWindows()
