@@ -1,0 +1,28 @@
+#create the catkin workspace/folder with the relevant ROS packages
+cd ~/catkin_ws/src
+catkin_create_pkg yolo_detect rospy std_msgs sensor_msgs cv_bridge
+
+cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+
+#create a virtual environment for ultralytics (or any other libraries you wish to include)
+python3 -m venv ~/yolo_env
+source ~/yolo_env/bin/activate  #do not deactivate until any ROS node is done running. Can create a .launch script which activates the environment on rosrun of any script
+pip install ultralytics 
+
+#write ROS node
+cd ~/catkin_ws/src/yolo_detect
+mkdir scripts
+chmod +x scripts/yolo_node.py
+
+#yolo_node.py
+
+import rospy
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
+from cv_bridge import CvBridge
+import cv2
+from ultralytics import YOLO
+
+...
